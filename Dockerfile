@@ -2,10 +2,9 @@ FROM golang:alpine as builder
 
 WORKDIR /go/src/github.com/estk/arbi
 COPY main.go .
-RUN go build -o arbi .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 
-FROM alpine:latest
-WORKDIR /root/
-COPY --from=builder /go/src/github.com/estk/arbi/arbi .
+FROM scratch
+COPY --from=builder /go/src/github.com/estk/arbi/main /
 EXPOSE 8080
-CMD ["./arbi"]
+CMD ["/main"]
