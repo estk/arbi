@@ -6,20 +6,22 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 const (
 	port      = 8080
 	sizeParam = "size"
-	usage     = `Usage: curl <host>:<port>/bytes?size=<size>
-	Where size = 1k|32k|128k|512k|1m|8m|32m
+	unitParam = "unit"
+	usage     = `Usage: curl <host>:<port>/bytes?size=<uint>&unit=<unit>
+	Where unit = b|k|m
 
-Example: curl localhost:8080/bytes?size=1k > 1k`
+Example: curl localhost:8080/bytes?size=1&unit=k > 1k`
 )
 const (
-	_      = iota
-	kb int = 1 << (10 * iota)
-	mb
+	B       = iota
+	KB uint = 1 << (10 * iota)
+	MB
 )
 
 func main() {
@@ -30,8 +32,10 @@ func main() {
 }
 
 func randomBits(w http.ResponseWriter, r *http.Request) {
-	size := r.URL.Query().Get(sizeParam)
-	n, err := numBytes(size)
+	q := r.URL.Query()
+	size := q.Get(sizeParam)
+	unit := q.Get(unitParam)
+	n, err := numBytes(size, unit)
 	if err != nil {
 		log.Println(err.Error())
 		w.WriteHeader(http.StatusBadRequest)
@@ -48,22 +52,24 @@ func randomBits(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func numBytes(size string) (int, error) {
-	switch size {
-	case "1k":
-		return kb, nil
-	case "32k":
-		return kb * 32, nil
-	case "128k":
-		return kb * 128, nil
-	case "512k":
-		return kb * 512, nil
-	case "1m":
-		return mb * 1, nil
-	case "8m":
-		return mb * 8, nil
-	case "32m":
-		return mb * 32, nil
+func numBytes(size, unit string) (uint, error) {
+	var base uint
+	switch unit {
+	case "b":
+		base = B
+	case "k":
+		base = KB
+	case "m":
+		base = MB
 	}
-	return 0, errors.New("unable to get determine size")
+
+	m, err := strconv.ParseUint(size, 10, 32)
+	if err != nil {
+		return 0, errors.New("unable to get determine size")
+	}
+	n := base * uint(m)
+	if n > 512*MB {
+		return 0, errors.New("too many bytes requested")
+	}
+	return n, nil
 }
